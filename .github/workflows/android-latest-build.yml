@@ -49,12 +49,21 @@ jobs:
         working-directory: ${{ steps.app.outputs.app_path }}
         shell: bash
         run: |
+          if [ ! -f ./gradlew ]; then
+            echo "gradlew missing in ${{ steps.app.outputs.app_path }}" >&2
+            exit 1
+          fi
           chmod +x ./gradlew
           ./gradlew test
           ./gradlew assembleDebug
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.app.outputs.app_slug }}-debug-apk
-          path: ${{ steps.app.outputs.app_path }}/app/build/outputs/apk/debug/*.apk
+      - name: Discover APK paths
+        id: apk
+        working-directory: ${{ steps.app.outputs.app_path }}
+        shell: bash
+        run: |
+          APK_PATHS="$(find . -path '*/build/outputs/apk/debug/*.apk' -print || true)"
+          if [ -z "$APK_PATHS" ]; then
+            echo "APK_NOT_FOUND" >&2
+            exit 1
+          fi
