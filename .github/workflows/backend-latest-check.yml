@@ -1,0 +1,54 @@
+name: Backend (Latest App) Tests
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read latest app root
+        id: app
+        shell: bash
+        run: |
+          APP_PATH="$(cat apps/LATEST_APP_PATH.txt | tr -d '\r\n')"
+          APP_ROOT="$(dirname "$APP_PATH")"
+          echo "app_root=$APP_ROOT" >> "$GITHUB_OUTPUT"
+          echo "backend_path=$APP_ROOT/backend" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if no backend
+        shell: bash
+        run: |
+          if [ ! -d "${{ steps.app.outputs.backend_path }}" ]; then
+            echo "No backend folder for latest app. Skipping."
+            exit 0
+          fi
+
+      - name: Set up Python
+        if: ${{ hashFiles(format('{0}/**', steps.app.outputs.backend_path)) != '' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps + run tests (if backend exists)
+        shell: bash
+        run: |
+          if [ ! -d "${{ steps.app.outputs.backend_path }}" ]; then exit 0; fi
+          cd "${{ steps.app.outputs.backend_path }}"
+
+          if [ -f requirements.txt ]; then
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+          fi
+
+          if [ -d tests ]; then
+            pytest -q
+          else
+            echo "No tests/ directory; backend check is minimal."
+          fi
